@@ -1,0 +1,39 @@
+name: gno
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.9"
+
+      # Pin gnolang/gno master at the commit this repo was written against.
+      # gno, gnokey, and gnodev from that tree speak the same interrealm
+      # conventions the packages use (crossing functions, cur realm).
+      - name: Install gno
+        run: |
+          set -euo pipefail
+          git init /tmp/gno-src
+          git -C /tmp/gno-src remote add origin https://github.com/gnolang/gno.git
+          git -C /tmp/gno-src fetch --depth 1 origin 58af98ed7956844df743c12f26834c5a1d3468e4
+          git -C /tmp/gno-src checkout --detach FETCH_HEAD
+          make -C /tmp/gno-src install.gno
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Format
+        run: |
+          gno fmt ./gno.land/...
+          git diff --exit-code
+
+      - name: Lint
+        run: gno lint ./gno.land/p/faddat/burrow ./gno.land/r/faddat/burrow
+
+      - name: Test
+        run: gno test ./gno.land/p/faddat/burrow ./gno.land/r/faddat/burrow
